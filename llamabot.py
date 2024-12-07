@@ -163,6 +163,13 @@ def run():
       logger.info(f"Listening to messages on channel {ctx.channel.name} of server: {ctx.guild.id} "
                 f"from {datetime.now().strftime('%m-%d-%Y %H:%M:%S')}")
       await ctx.send('Listening to your messages now.')
+  @bot.command()
+  async def read_history(ctx, channel_id: int = None):
+      """Command to read the message history of a specific channel"""
+      channel = bot.get_channel(ctx.channel.id)
+      await ctx.send(f"Reading history for channel: {channel.name}")
+      async for message in channel.history(limit=None):  # Set limit for the number of messages to retrieve
+          print(f"{message.author}: {message.content}")
 
   @bot.command(
     aliases=['s']
