@@ -9,7 +9,8 @@ from discord.ext import commands
 
 from llama_index import VectorStoreIndex, StorageContext, ServiceContext
 from llama_index.postprocessor import FixedRecencyPostprocessor
-from llama_index.embeddings import GeminiEmbedding
+#from llama_index.embeddings import GeminiEmbedding
+from llama_index.embeddings import OllamaEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.schema import TextNode, QueryBundle
 from llama_index.vector_stores.types import (
@@ -85,7 +86,11 @@ qd_client = qdrant_client.QdrantClient(
 
 qd_collection = 'discord_llamabot'
 
-embed_model = GeminiEmbedding()
+embed_model = llama_embedding = OllamaEmbedding(
+    model_name="llama3.2",
+    base_url="http://localhost:11434",
+    ollama_additional_kwargs={"mirostat": 0, "temperature": 0.7},
+)
 
 use_openai = bool(os.environ.get("USE_OPENAI", False))
 use_cohere = bool(os.environ.get("USE_COHERE", False))
