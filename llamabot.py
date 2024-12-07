@@ -80,7 +80,7 @@ else:
 # initialize qdrant client
 qd_client = qdrant_client.QdrantClient(
   url=settings.QDRANT_URL,
-  api_key=settings.QDRANT_API_KEY
+  #api_key=settings.QDRANT_API_KEY
 )
 
 qd_collection = 'discord_llamabot'
@@ -89,6 +89,7 @@ embed_model = GeminiEmbedding()
 
 use_openai = bool(os.environ.get("USE_OPENAI", False))
 use_cohere = bool(os.environ.get("USE_COHERE", False))
+use_ollama = bool(os.environ.get("USE_OLLAMA", False))
 # print(use_openai)
 
 # if os.environ.get("GOOGLE_API_KEY", None):
@@ -104,7 +105,13 @@ elif use_cohere:
   from llama_index.llms import Cohere
   print("Using Cohere")
   llm=Cohere(api_key=os.environ.get('COHERE_KEY'))
-
+elif use_ollama:
+  from llama_index.llms import Ollama
+  print("Using Llama 3.2 via Ollama")
+  llm = Ollama(
+    model="llama3.2",
+    base_url="http://localhost:11434",  # Default Ollama server URL
+  )
 else:
   from llama_index.llms import Gemini
   print("Using Gemini Pro")
