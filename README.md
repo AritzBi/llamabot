@@ -51,6 +51,13 @@ If you wanna use GPT-4 to generate responses, then set `USE_OPENAI` to 1 and add
 
 If you wanna use Cohere to generate responses, then set `USE_COHERE` to 1 and add `COHERE_KEY`
 
+If you wanna use oLlama go generate responses, the set `USE_OLLAMA` to True
+
+#### Using Ollama
+ollama serve
+ollama pull llama3.2
+ollama run llama3.2
+
 Next run the program:
 
 ```bash

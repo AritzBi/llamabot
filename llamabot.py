@@ -48,7 +48,7 @@ def persist_listening():
 
 def persist_messages():
   global messages
-
+  print("Persisting messages")
   # print(messages)
   with open(messages_path, 'wb') as file:
     pickle.dump(messages, file)
@@ -165,11 +165,51 @@ def run():
       await ctx.send('Listening to your messages now.')
   @bot.command()
   async def read_history(ctx, channel_id: int = None):
-      """Command to read the message history of a specific channel"""
-      channel = bot.get_channel(ctx.channel.id)
+      """Command to read the message history of a specific channel and persist it."""
+      channel = bot.get_channel(ctx.channel.id if channel_id is None else channel_id)
       await ctx.send(f"Reading history for channel: {channel.name}")
-      async for message in channel.history(limit=None):  # Set limit for the number of messages to retrieve
-          print(f"{message.author}: {message.content}")
+
+      async for message in channel.history(limit=None):  # Adjust the limit as needed
+          when = message.created_at
+          who = message.author
+          msg_content = message.content
+
+          # Process message content for mentions
+          processed_message = process_incoming_message(message)
+
+          # Log and persist the message
+          msg_str = f"[{when.strftime('%m-%d-%Y %H:%M:%S')}] - @{who} on #[{str(message.channel)[:15]}]: `{processed_message.content}`"
+
+          if not messages.get(message.guild.id, None):
+              messages[message.guild.id] = []
+
+          messages[message.guild.id].append(Message(
+              is_in_thread=str(message.channel.type) == 'public_thread',
+              posted_at=when,
+              author=str(who),
+              message_str=msg_str,
+              channel_id=message.channel.id,
+              just_msg=processed_message.content
+          ))
+        # Create a TextNode for Qdrant
+          node = TextNode(
+              text=msg_str,
+              metadata={
+                  'author': str(who),
+                  'posted_at': str(when),
+                  'channel_id': message.channel.id,
+                  'guild_id': message.guild.id
+              },
+              excluded_llm_metadata_keys=['author', 'posted_at', 'channel_id', 'guild_id'],
+              excluded_embed_metadata_keys=['author', 'posted_at', 'channel_id', 'guild_id'],
+          )
+
+          # Insert the node into Qdrant
+          index.insert_nodes([node])
+      print("Haciendo persistentes {} messages".format(len(messages[message.guild.id])))
+      # Persist the updated messages
+      persist_messages()
+      await ctx.send("History reading and persistence complete.")
 
   @bot.command(
     aliases=['s']
