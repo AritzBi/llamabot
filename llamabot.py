@@ -7,18 +7,20 @@ import traceback
 import discord
 from discord.ext import commands
 
-from llama_index import VectorStoreIndex, StorageContext, ServiceContext
-from llama_index.postprocessor import FixedRecencyPostprocessor
+from llama_index.core.indices.vector_store.base import VectorStoreIndex
+from llama_index.core import  StorageContext 
+from llama_index.core import Settings
+from llama_index.core.postprocessor import FixedRecencyPostprocessor
 #from llama_index.embeddings import GeminiEmbedding
-from llama_index.embeddings import OllamaEmbedding
+#from llama_index.core.embeddings import OllamaEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.schema import TextNode, QueryBundle
-from llama_index.vector_stores.types import (
+from llama_index.core.schema import TextNode, QueryBundle
+from llama_index.core.vector_stores.types import (
     MetadataFilter,
     MetadataFilters,
     FilterOperator,
 )
-from llama_index import set_global_handler
+from llama_index.core import set_global_handler
 
 import qdrant_client
 
@@ -84,13 +86,34 @@ qd_client = qdrant_client.QdrantClient(
   #api_key=settings.QDRANT_API_KEY
 )
 
-qd_collection = 'discord_llamabot'
+qd_collection = 'discord_llamabot_BAAI'
 
-embed_model = llama_embedding = OllamaEmbedding(
+"""embed_model = OllamaEmbedding(
     model_name="llama3.2",
     base_url="http://localhost:11434",
     ollama_additional_kwargs={"mirostat": 0, "temperature": 0.7},
-)
+)"""
+
+
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+#from transformers import AutoTokenizer, AutoModel
+
+# Load the Hugging Face model
+model_name = "intfloat/multilingual-e5-large-instruct"
+#tokenizer = AutoTokenizer.from_pretrained(model_name)
+#model = AutoModel.from_pretrained(model_name)
+
+# Initialize the embedding provider
+"""embed_model = HuggingFaceEmbedding(
+    model=model,
+    tokenizer=tokenizer,
+    embed_batch_size=16  # Adjust batch size as needed
+)"""
+embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")
+#from llama_index.embeddings import InstructorEmbedding
+#embed_model = InstructorEmbedding(model_name="intfloat/multilingual-e5-large-instruct")
+
+#intfloat/multilingual-e5-large-instruct
 
 use_openai = bool(os.environ.get("USE_OPENAI", False))
 use_cohere = bool(os.environ.get("USE_COHERE", False))
@@ -111,7 +134,7 @@ elif use_cohere:
   print("Using Cohere")
   llm=Cohere(api_key=os.environ.get('COHERE_KEY'))
 elif use_ollama:
-  from llama_index.llms import Ollama
+  from llama_index.llms.ollama import Ollama
   print("Using Llama 3.2 via Ollama")
   llm = Ollama(
     model="llama3.2",
@@ -125,13 +148,12 @@ else:
 vector_store = QdrantVectorStore(client=qd_client,
                                  collection_name=qd_collection)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
-service_context = ServiceContext.from_defaults(
-  embed_model=embed_model,
-  llm=llm)
+Settings.llm = llm
+Settings.embed_model = embed_model
 
 index = VectorStoreIndex([],
                storage_context=storage_context,
-               service_context=service_context)
+               embed_model=embed_model)
 
 persist_messages()
 persist_listening()
@@ -305,7 +327,7 @@ def run():
     f"{message.channel.name} at {datetime.now().strftime('%m-%d-%Y %H:%M:%S')}"
     )
 
-    msg_str = f"[{when.strftime('%m-%d-%Y %H:%M:%S')}] - @{who} on #[{str(message.channel)[:15]}]: `{msg_content}`"
+    msg_str = f"@{who} on #[{str(message.channel)[:15]}]: `{msg_content}`"
 
     if not save_only_message:
       node = TextNode(
@@ -357,15 +379,14 @@ def run():
     )
     
     postprocessor = FixedRecencyPostprocessor(
-        top_k=8, 
+        top_k=2, 
         date_key="posted_at", # the key in the metadata to find the date
-        service_context=service_context
     )
     query_engine = index.as_query_engine(
-      service_context=service_context,
       filters=filters,
-      similarity_top_k=8,
-      node_postprocessors=[postprocessor])
+      similarity_top_k=30,
+      #node_postprocessors=[postprocessor]
+      )
     query_engine.update_prompts(
         {"response_synthesizer:text_qa_template": partially_formatted_prompt}
     )
@@ -375,7 +396,7 @@ def run():
     ][-1*settings.LAST_N_MESSAGES:-1]
     replies_query.append(query)
 
-    # print(replies_query)
+    print(replies_query)
     return query_engine.query(QueryBundle(
       query_str=query,
       custom_embedding_strs=replies_query
